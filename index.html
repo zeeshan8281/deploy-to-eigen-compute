@@ -195,17 +195,60 @@ SECRET_KEY=your-secret</pre>
 
 <!-- ===== UPGRADING ===== -->
 
-<h2>Upgrading (Future Deploys)</h2>
-<p>When you push a new version, build a new image tag and use <code>upgrade</code> instead of <code>deploy</code>:</p>
+<h2>Upgrading an Existing App</h2>
+<p>Already have an app running on EigenCompute and want to push a new version? Here's the full flow. You'll use <code>ecloud compute app upgrade</code> instead of <code>deploy</code>.</p>
 
-<pre><span class="dim"># 1. Build &amp; push new image</span>
-docker buildx build --platform linux/amd64 --no-cache \
-  -t yourdockerhub/yourapp:v1.0.1 --push .
+<h3>1. Make your code changes</h3>
+<p>Update your app code, fix bugs, add features — whatever you need. Then build it:</p>
+<pre>npm run build</pre>
 
-<span class="dim"># 2. Upgrade the running app</span>
-ecloud compute app upgrade &lt;APP-ID&gt; \
+<h3>2. Build &amp; push a new Docker image</h3>
+<p>Bump your version tag and push a new image. Same rules apply — <strong>must be <code>linux/amd64</code></strong>.</p>
+<pre>docker buildx build --platform linux/amd64 --no-cache \
+  -t yourdockerhub/yourapp:v1.0.1 --push .</pre>
+<div class="note">💡 Always use a new tag (e.g. <code>v1.0.1</code>) instead of overwriting <code>latest</code>. This makes rollbacks easy and ensures EigenCompute pulls the correct image.</div>
+
+<h3>3. Find your App ID</h3>
+<p>If you don't remember your App ID from the initial deploy, list all your apps:</p>
+<pre>ecloud compute app list</pre>
+<p>This will show all your deployed apps with their IDs, names, and status.</p>
+
+<h3>4. Run the upgrade</h3>
+<p>Pass your App ID (or app name) and the new image tag:</p>
+<pre>ecloud compute app upgrade &lt;APP-ID&gt; \
   --image-ref yourdockerhub/yourapp:v1.0.1 \
   --env-file .env</pre>
+<p>The CLI will interactively ask the same prompts as deploy — verifiable source, deployment method, etc. Your existing instance type, log visibility, and monitoring settings carry over.</p>
+
+<h3>5. Verify the upgrade</h3>
+<p>Watch the app restart with the new version:</p>
+<pre>ecloud compute app info --watch</pre>
+<p>And stream the logs to make sure it boots clean:</p>
+<pre>ecloud compute app logs --watch</pre>
+
+<h3>6. Health check</h3>
+<p>Hit your health endpoint to confirm the new version is live:</p>
+<pre>curl http://&lt;YOUR-PUBLIC-IP&gt;:3000/health</pre>
+<div class="success">✅ Your app is upgraded. The public IP stays the same — no DNS changes needed.</div>
+
+<h3>Updating environment variables only</h3>
+<p>If you only need to change env vars without changing the image, just pass the updated <code>.env</code> file:</p>
+<pre>ecloud compute app upgrade &lt;APP-ID&gt; --env-file .env</pre>
+
+<h3>Stopping &amp; restarting</h3>
+<p>Need to take your app offline temporarily?</p>
+<pre><span class="dim"># Stop (keeps the app, just halts the instance)</span>
+ecloud compute app stop &lt;APP-ID&gt;
+
+<span class="dim"># Start it back up</span>
+ecloud compute app start &lt;APP-ID&gt;
+
+<span class="dim"># Permanently delete (irreversible)</span>
+ecloud compute app terminate &lt;APP-ID&gt;</pre>
+
+<h3>View release history</h3>
+<p>See all past deployments and their image refs:</p>
+<pre>ecloud compute app releases &lt;APP-ID&gt;</pre>
 
 <!-- ===== COMMANDS ===== -->
 
