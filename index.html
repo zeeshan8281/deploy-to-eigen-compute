@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Deploy to EigenCompute</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; line-height: 1.7; }
+  h1 { font-size: 32px; margin-bottom: 4px; }
+  h1 + p { color: #666; font-size: 16px; margin-top: 0; }
+  h2 { font-size: 22px; margin-top: 40px; border-bottom: 1px solid #eee; padding-bottom: 6px; }
+  h2 + p { color: #555; margin-top: 6px; }
+  pre { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 14px; }
+  code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 14px; }
+  .prompt { color: #569cd6; }
+  .answer { color: #6a9955; }
+  .dim { color: #808080; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  th, td { border: 1px solid #ddd; padding: 10px 14px; text-align: left; }
+  th { background: #f5f5f5; font-weight: 600; }
+  ul, ol { padding-left: 24px; }
+  li { margin: 6px 0; }
+  .note { background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px 16px; border-radius: 4px; margin: 12px 0; }
+  .success { background: #d4edda; border-left: 4px solid #28a745; padding: 12px 16px; border-radius: 4px; margin: 12px 0; }
+</style>
+</head>
+<body>
+
+<h1>Deploy Your App to EigenCompute</h1>
+<p>Step-by-step guide to go from zero to a live app running inside an Intel TDX Trusted Execution Environment on <a href="https://docs.eigencloud.xyz/eigencloud/eigencloud-overview">EigenCompute</a>. No prior EigenCloud experience needed.</p>
+
+<!-- ===== WHAT IS EIGENCOMPUTE ===== -->
+
+<h2>What is EigenCompute?</h2>
+<p><a href="https://docs.eigencloud.xyz/eigencloud/eigencloud-overview">EigenCompute</a> is a verifiable compute platform by <a href="https://www.eigenlayer.xyz/">EigenLayer</a>. You give it a Docker image, it runs your app inside an <a href="https://www.intel.com/content/www/us/en/developer/tools/trust-domain-extensions/overview.html">Intel TDX</a> Trusted Execution Environment (TEE) — meaning your code and data are protected even from the host machine. Every execution can be cryptographically attested on-chain.</p>
+
+<!-- ===== PREREQUISITES ===== -->
+
+<h2>Prerequisites</h2>
+<p>Make sure you have these installed before starting. If you don't have them yet, follow the links to set them up.</p>
+<ul>
+  <li><strong><a href="https://docs.docker.com/get-docker/">Docker Desktop</a></strong> — must have <a href="https://docs.docker.com/build/buildx/">buildx</a> enabled (included by default in Docker Desktop 4.x+)</li>
+  <li><strong><a href="https://nodejs.org/en/download">Node.js 20+</a></strong> — or whatever runtime your app uses</li>
+  <li><strong><a href="https://hub.docker.com/signup">Docker Hub account</a></strong> — to push your container image (free tier works)</li>
+  <li><strong>An Ethereum wallet</strong> — you'll need a private key to authenticate with EigenCompute. You can generate one during setup, or use an existing one from <a href="https://metamask.io/">MetaMask</a></li>
+</ul>
+
+<!-- ===== STEP 1 ===== -->
+
+<h2>Step 1 — Install the ecloud CLI</h2>
+<p>The <code>ecloud</code> CLI is the command-line tool that manages everything — authentication, billing, deployment, logs, upgrades. Install it with a single command:</p>
+<pre>curl -fsSL https://raw.githubusercontent.com/Layr-Labs/eigencloud-tools/master/install-all.sh | bash</pre>
+<p>Source: <a href="https://github.com/Layr-Labs/eigencloud-tools">github.com/Layr-Labs/eigencloud-tools</a></p>
+<p>Verify it installed correctly:</p>
+<pre>ecloud version
+<span class="dim"># Should output something like: Version: 0.3.4</span></pre>
+<div class="note">💡 If <code>ecloud</code> is not found after install, restart your terminal or run <code>source ~/.bashrc</code> / <code>source ~/.zshrc</code>.</div>
+
+<!-- ===== STEP 2 ===== -->
+
+<h2>Step 2 — Authenticate</h2>
+<p>EigenCompute uses an Ethereum private key for identity and transaction signing. The CLI stores it securely in your <a href="https://en.wikipedia.org/wiki/GNOME_Keyring">OS keyring</a> (macOS Keychain / Linux Secret Service) — it's never saved to disk in plaintext.</p>
+<p><strong>Option A:</strong> If you already have a private key (e.g. from <a href="https://metamask.io/">MetaMask</a>):</p>
+<pre>$ ecloud auth login
+<span class="prompt">? Enter private key:</span> <span class="answer">0x7a9f...c3e1</span>
+<span class="answer">✓ Private key stored securely in OS keyring</span></pre>
+<p><strong>Option B:</strong> Generate a brand new key:</p>
+<pre>$ ecloud auth generate --store
+<span class="answer">✓ New private key generated and stored in OS keyring</span></pre>
+<p>Confirm you're authenticated:</p>
+<pre>$ ecloud auth whoami
+<span class="dim">Authenticated as 0x1002...976d2</span></pre>
+<div class="note">💡 This address is your deployer identity. You'll use it to manage all your EigenCompute apps.</div>
+
+<!-- ===== STEP 3 ===== -->
+
+<h2>Step 3 — Set Up Billing</h2>
+<p>EigenCompute requires an active billing subscription before you can deploy. This is a one-time setup — you won't need to do this again for future deploys.</p>
+<pre>ecloud billing subscribe</pre>
+<p>The CLI will walk you through the payment setup. Check your billing status anytime:</p>
+<pre>ecloud billing status</pre>
+
+<!-- ===== STEP 4 ===== -->
+
+<h2>Step 4 — Build Your App</h2>
+<p>Compile your application. Make sure it builds cleanly before containerizing.</p>
+<pre>$ npm run build
+<span class="dim">> tsc
+Compiling TypeScript to dist/ ...
+</span><span class="answer">✓ Build complete — 0 errors</span></pre>
+
+<!-- ===== STEP 5 ===== -->
+
+<h2>Step 5 — Write Your Dockerfile</h2>
+<p>Your app needs a <a href="https://docs.docker.com/reference/dockerfile/">Dockerfile</a> so EigenCompute knows how to build and run it. If you've never written one, here's a minimal example for a Node.js app:</p>
+<pre>FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+EXPOSE 3000
+USER root
+CMD ["node", "dist/index.js"]</pre>
+<div class="note">⚠️ Your app <strong>must run as <code>root</code></strong> — this is required by EigenCompute's TEE environment. Make sure you have <code>USER root</code> in your Dockerfile.</div>
+<p>You can also scaffold a project with the correct Dockerfile using <code>ecloud compute app create --name myapp --language typescript</code>. Supported languages: <code>typescript</code>, <code>python</code>, <code>golang</code>, <code>rust</code>.</p>
+
+<!-- ===== STEP 6 ===== -->
+
+<h2>Step 6 — Build &amp; Push Docker Image</h2>
+<p>Build your Docker image and push it to <a href="https://hub.docker.com/">Docker Hub</a>. The image <strong>must be <code>linux/amd64</code></strong> because EigenCompute runs on <a href="https://www.intel.com/content/www/us/en/developer/tools/trust-domain-extensions/overview.html">Intel TDX</a> hardware — even if you're developing on an ARM Mac.</p>
+<p>First, make sure you're logged into Docker Hub:</p>
+<pre>docker login</pre>
+<p>Then build and push:</p>
+<pre>docker buildx build --platform linux/amd64 --no-cache \
+  -t yourdockerhub/yourapp:v1.0.0 --push .</pre>
+<div class="note">⚠️ Do NOT skip <code>--platform linux/amd64</code>. If you're on an Apple Silicon Mac, Docker will default to ARM — which will fail on EigenCompute.</div>
+
+<!-- ===== STEP 7 ===== -->
+
+<h2>Step 7 — Prepare Your .env File</h2>
+<p>Create a <code>.env</code> file with your app's runtime secrets and configuration. This file gets <strong>encrypted and injected into the TEE at deploy time</strong> — your secrets never touch disk unencrypted on the host machine.</p>
+<pre>PORT=3000
+DATABASE_URL=postgres://user:pass@host:5432/db
+API_KEY=sk-your-api-key
+SECRET_KEY=your-secret</pre>
+
+<!-- ===== STEP 8 ===== -->
+
+<h2>Step 8 — Deploy to EigenCompute</h2>
+<p>This is the main event. Run the deploy command — the CLI will interactively prompt you for each configuration option, one at a time. You don't need to memorize any flags.</p>
+
+<pre>$ ecloud compute app deploy
+
+<span class="prompt">? Image reference:</span> <span class="answer">yourdockerhub/yourapp:v1.0.0</span>
+<span class="dim">  The Docker image to deploy. Must be pushed to a public registry.</span>
+
+<span class="prompt">? Environment file path:</span> <span class="answer">.env</span>
+<span class="dim">  Path to your .env file. Variables are encrypted before injection.</span>
+
+<span class="prompt">? Instance type:</span> <span class="dim">(Use arrow keys)</span>
+  <span class="prompt">❯ g1-standard-4t</span>
+  <span class="dim">  g1-standard-8t</span>
+<span class="answer">  → g1-standard-4t</span>
+
+<span class="prompt">? Log visibility:</span> <span class="dim">(Use arrow keys)</span>
+  <span class="prompt">❯ public</span>
+  <span class="dim">  private</span>
+  <span class="dim">  off</span>
+<span class="answer">  → public</span>
+
+<span class="prompt">? Enable resource monitoring?</span> <span class="dim">(Y/n)</span> <span class="answer">Yes</span>
+
+<span class="prompt">? Build from verifiable source?</span> <span class="dim">(y/N)</span> <span class="answer">No</span>
+<span class="dim">  Select No if you've already pushed a pre-built image.</span>
+
+<span class="prompt">? Deployment method:</span> <span class="dim">(Use arrow keys)</span>
+  <span class="dim">  Build on EigenCompute</span>
+  <span class="prompt">❯ Deploy from registry</span>
+<span class="answer">  → Deploy from registry</span>
+
+<span class="dim">Pulling image from Docker Hub...</span>
+<span class="dim">Provisioning Intel TDX enclave...</span>
+<span class="dim">Injecting environment variables...</span>
+
+<span class="answer">Transaction sent: 0xab3f...7e21</span>
+<span class="answer">✓ App deployed successfully on EigenCompute</span>
+<span class="answer">➜ App ID: 0x8F38007B8F7D91c77CEd4dEE0dbD361c130982A7</span>
+<span class="answer">➜ Public IP: 35.222.154.28</span></pre>
+
+<div class="success">✅ Your app is now running inside an Intel TDX Trusted Execution Environment.</div>
+
+<!-- ===== STEP 9 ===== -->
+
+<h2>Step 9 — Verify Your Deployment</h2>
+<p>Your app is deployed — now make sure it's actually running and reachable.</p>
+
+<p><strong>Check app status:</strong></p>
+<pre>ecloud compute app info --watch</pre>
+<p>This shows your app's status, public IP, and instance details. The <code>--watch</code> flag auto-refreshes every 5 seconds so you can see the app boot up in real time.</p>
+
+<p><strong>Stream logs:</strong></p>
+<pre>ecloud compute app logs --watch</pre>
+<p>See your app's stdout/stderr live — useful for debugging startup issues.</p>
+
+<p><strong>Health check from your terminal:</strong></p>
+<pre>$ curl http://&lt;YOUR-PUBLIC-IP&gt;:3000/health
+<span class="answer">{"status":"ok","tee":"active","version":"1.0.0"}</span></pre>
+<p>Replace <code>&lt;YOUR-PUBLIC-IP&gt;</code> with the IP shown in <code>ecloud compute app info</code>.</p>
+<div class="success">✅ If you see a JSON response, your app is live inside an Intel TDX enclave. Congrats!</div>
+
+<!-- ===== UPGRADING ===== -->
+
+<h2>Upgrading (Future Deploys)</h2>
+<p>When you push a new version, build a new image tag and use <code>upgrade</code> instead of <code>deploy</code>:</p>
+
+<pre><span class="dim"># 1. Build &amp; push new image</span>
+docker buildx build --platform linux/amd64 --no-cache \
+  -t yourdockerhub/yourapp:v1.0.1 --push .
+
+<span class="dim"># 2. Upgrade the running app</span>
+ecloud compute app upgrade &lt;APP-ID&gt; \
+  --image-ref yourdockerhub/yourapp:v1.0.1 \
+  --env-file .env</pre>
+
+<!-- ===== COMMANDS ===== -->
+
+<h2>All Useful Commands</h2>
+<table>
+  <tr><th>Command</th><th>What it does</th></tr>
+  <tr><td><code>ecloud auth whoami</code></td><td>Show your authenticated Ethereum address</td></tr>
+  <tr><td><code>ecloud compute app list</code></td><td>List all your deployed apps</td></tr>
+  <tr><td><code>ecloud compute app info &lt;APP-ID&gt;</code></td><td>Show app status, IP, instance details</td></tr>
+  <tr><td><code>ecloud compute app info --watch</code></td><td>Live-refresh app status every 5s</td></tr>
+  <tr><td><code>ecloud compute app logs &lt;APP-ID&gt; -w</code></td><td>Stream app logs in real time</td></tr>
+  <tr><td><code>ecloud compute app stop &lt;APP-ID&gt;</code></td><td>Stop a running app</td></tr>
+  <tr><td><code>ecloud compute app start &lt;APP-ID&gt;</code></td><td>Start a stopped app</td></tr>
+  <tr><td><code>ecloud compute app terminate &lt;APP-ID&gt;</code></td><td>Permanently delete an app</td></tr>
+  <tr><td><code>ecloud compute app releases &lt;APP-ID&gt;</code></td><td>Show release history &amp; verifiable build info</td></tr>
+  <tr><td><code>ecloud compute app configure tls</code></td><td>Set up HTTPS/TLS with auto Let's Encrypt certs</td></tr>
+  <tr><td><code>ecloud billing status</code></td><td>Check billing subscription</td></tr>
+  <tr><td><code>ecloud billing cancel</code></td><td>Cancel billing subscription</td></tr>
+</table>
+
+<!-- ===== INSTANCE TYPES ===== -->
+
+<h2>Instance Types</h2>
+<table>
+  <tr><th>Type</th><th>Description</th></tr>
+  <tr><td><code>g1-standard-4t</code></td><td>4-core Intel TDX enclave</td></tr>
+  <tr><td><code>g1-standard-8t</code></td><td>8-core Intel TDX enclave</td></tr>
+</table>
+
+<!-- ===== NOTES ===== -->
+
+<h2>Important Notes</h2>
+<ul>
+  <li>Docker images <strong>must be <code>linux/amd64</code></strong> — ARM images will not work on <a href="https://www.intel.com/content/www/us/en/developer/tools/trust-domain-extensions/overview.html">Intel TDX</a></li>
+  <li>Your app <strong>must run as <code>root</code></strong> inside the container (TEE requirement)</li>
+  <li>Environment variables are <strong>encrypted</strong> and injected at runtime — they never touch disk unencrypted</li>
+  <li>TEE provides <strong>hardware-level isolation</strong> via Intel TDX — your code and data are protected even from the host machine operator</li>
+  <li>A KMS signing key is available inside the TEE at <code>/usr/local/bin/kms-signing-public-key.pem</code> for <a href="https://docs.eigencloud.xyz/eigencloud/eigencloud-overview">cryptographic attestation</a></li>
+  <li>Use <code>ecloud compute app deploy</code> for first-time deploys, <code>ecloud compute app upgrade</code> for updates</li>
+</ul>
+
+<h2>Resources</h2>
+<ul>
+  <li><a href="https://docs.eigencloud.xyz/">EigenCloud Documentation</a></li>
+  <li><a href="https://github.com/Layr-Labs/ecloud">ecloud CLI — GitHub</a></li>
+  <li><a href="https://github.com/Layr-Labs/eigencloud-tools">eigencloud-tools Installer — GitHub</a></li>
+  <li><a href="https://console.eigencloud.xyz/">EigenCloud Developer Console</a></li>
+  <li><a href="https://blog.eigencloud.xyz/eigencloud-brings-verifiable-ai-to-mass-market-with-eigenai-and-eigencompute-launches/">EigenCompute Launch Blog Post</a></li>
+  <li><a href="https://docs.docker.com/get-docker/">Docker Installation Guide</a></li>
+</ul>
+
+</body>
+</html>
