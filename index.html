@@ -247,44 +247,61 @@ SECRET_KEY=your-secret</pre>
   <tr><td><strong><a href="#step-9b">B — Build from Verifiable Source</a></strong></td><td>You want EigenCompute to build from your GitHub repo</td><td>Reproducible builds, on-chain build hash verification</td></tr>
 </table>
 
-<h3 id="step-9a">Method A — Deploy from Registry</h3>
-<p>You've already built and pushed a Docker image (Step 7). Now deploy it. The CLI will interactively prompt you for each option.</p>
+<h3 id="step-9a">Method A — Deploy from Registry (7 prompts)</h3>
+<p>You've already built and pushed a Docker image (Step 7). Now deploy it. The CLI asks exactly <strong>7 interactive prompts</strong> in this order, then immediately starts deploying.</p>
 
 <pre>$ ecloud compute app deploy
 
-<span class="prompt">? Build from verifiable source?</span> <span class="dim">(y/N)</span> <span class="answer">No</span>
-<span class="dim">  Select No — you've already pushed a pre-built image to a registry.</span>
+<span class="dim"># Prompt 1</span>
+<span class="prompt">? Build from verifiable source?</span> <span class="dim">(y/N)</span> <span class="answer">N</span>
 
-<span class="prompt">? Deployment method:</span> <span class="dim">(Use arrow keys)</span>
-  <span class="dim">  Build on EigenCompute</span>
-  <span class="prompt">❯ Deploy from registry</span>
-<span class="answer">  → Deploy from registry</span>
+<span class="dim"># Prompt 2 — Docker image reference</span>
+<span class="prompt">? Enter Docker image reference:</span> <span class="answer">yourdockerhub/yourapp:v1.0.0</span>
 
-<span class="prompt">? Image reference:</span> <span class="answer">yourdockerhub/yourapp:v1.0.0</span>
-<span class="dim">  The Docker image to deploy. Must be pushed to a public registry.</span>
+<span class="dim"># Prompt 3 — App name (default: derived from image name)</span>
+<span class="prompt">? Enter app name:</span> <span class="answer">myapp</span>
 
-<span class="prompt">? Instance type:</span> <span class="dim">(Use arrow keys)</span>
-  <span class="dim">  g1-micro-1v      — Shared 2 vCPUs, 1 GB, Shielded VM</span>
-  <span class="dim">  g1-medium-1v     — Shared 2 vCPUs, 4 GB, Shielded VM</span>
-  <span class="dim">  g1-custom-2-4096s — 2 vCPUs, 4 GB, SEV-SNP</span>
-  <span class="dim">  g1-standard-2s   — 2 vCPUs, 8 GB, SEV-SNP</span>
-  <span class="prompt">❯ g1-standard-4t   — 4 vCPUs, 16 GB, Intel TDX</span>
-  <span class="dim">  g1-standard-8t   — 8 vCPUs, 32 GB, Intel TDX</span>
+<span class="dim"># Prompt 4 — Environment file</span>
+<span class="prompt">? Choose an option:</span>
+  <span class="prompt">❯ Enter path to existing env file</span>
+  <span class="dim">  Continue without env file</span>
+<span class="answer">  → Enter path to existing env file</span>
+<span class="prompt">? Enter environment file path:</span> <span class="answer">.env</span>
+
+<span class="dim"># Prompt 5 — Instance type</span>
+<span class="prompt">? Choose instance:</span>
+  <span class="dim">  g1-micro-1v      — Shared 2 vCPUs, 1 GB memory, Shielded VM (default)</span>
+  <span class="dim">  g1-medium-1v     — Shared 2 vCPUs, 4 GB memory, Shielded VM</span>
+  <span class="dim">  g1-custom-2-4096s — 2 vCPUs, 4 GB memory, SEV-SNP</span>
+  <span class="dim">  g1-standard-2s   — 2 vCPUs, 8 GB memory, SEV-SNP</span>
+  <span class="prompt">❯ g1-standard-4t   — 4 vCPUs, 16 GB memory, TDX</span>
+  <span class="dim">  g1-standard-8t   — 8 vCPUs, 32 GB memory, TDX</span>
 <span class="answer">  → g1-standard-4t</span>
 
-<span class="prompt">? Port:</span> <span class="answer">3000</span>
+<span class="dim"># Prompt 6 — Log visibility</span>
+<span class="prompt">? Do you want to view your app's logs?</span>
+  <span class="dim">  Yes, but only viewable by app and platform admins</span>
+  <span class="prompt">❯ Yes, publicly viewable by anyone</span>
+  <span class="dim">  No, disable logs entirely</span>
+<span class="answer">  → Yes, publicly viewable by anyone</span>
 
-<span class="prompt">? Environment file path:</span> <span class="answer">.env</span>
-<span class="dim">  Path to your .env file. Variables are encrypted before injection.</span>
+<span class="dim"># Prompt 7 — Resource monitoring</span>
+<span class="prompt">? Show resource usage (CPU/memory) for your app?</span>
+  <span class="prompt">❯ Yes, enable resource usage monitoring</span>
+  <span class="dim">  No, disable resource usage monitoring</span>
+<span class="answer">  → Yes, enable resource usage monitoring</span>
 
-<span class="dim">Pulling image from Docker Hub...</span>
-<span class="dim">Provisioning Intel TDX enclave...</span>
-<span class="dim">Injecting environment variables...</span>
+<span class="dim">Checking if image needs layering...</span>
+<span class="dim">Pulling image yourdockerhub/yourapp:v1.0.0...</span>
+<span class="dim">Building updated image with ecloud components...</span>
+<span class="dim">Publishing updated image to yourdockerhub/yourapp:v1.0.0-layered...</span>
 
 <span class="answer">Transaction sent: 0xab3f...7e21</span>
 <span class="answer">✓ App deployed successfully on EigenCompute</span>
 <span class="answer">➜ App ID: 0x8F38007B8F7D91c77CEd4dEE0dbD361c130982A7</span>
 <span class="answer">➜ Public IP: 35.222.154.28</span></pre>
+
+<div class="note"><strong>No port prompt</strong> — EigenCompute detects the port from your Dockerfile's <code>EXPOSE</code> directive. <strong>No confirmation prompt</strong> — deployment starts immediately after prompt 7.</div>
 
 <p>Or use flags to skip interactive prompts:</p>
 <pre>ecloud compute app deploy \
@@ -294,67 +311,74 @@ SECRET_KEY=your-secret</pre>
   --log-visibility public \
   --resource-usage-monitoring enable</pre>
 
-<div class="success">✅ Your app is now running inside an Intel TDX Trusted Execution Environment. Save your <strong>App ID</strong> — you'll need it for upgrades, logs, and management.</div>
+<div class="success">✅ Your app is now running inside a Trusted Execution Environment. Save your <strong>App ID</strong> — you'll need it for upgrades, logs, and management.</div>
 
-<h3 id="step-9b">Method B — Build from Verifiable Source</h3>
-<p>Instead of building locally and pushing to Docker Hub, you can have EigenCompute clone your GitHub repo and build the image inside the TEE. This gives you <strong>reproducible, verifiable builds</strong> — the build hash is recorded on-chain so anyone can confirm the running code matches your source repo.</p>
+<h3 id="step-9b">Method B — Build from Verifiable Source (9 prompts)</h3>
+<p>EigenCompute clones your public GitHub repo, builds the Docker image, and deploys it — all inside the TEE. The build hash is recorded on-chain for third-party verification. <strong>No Docker Hub account needed.</strong></p>
 
 <p><strong>Requirements:</strong></p>
 <ul>
-  <li>Public GitHub repo (or private with access token)</li>
-  <li>Repo must contain a <code>Dockerfile</code> at the root</li>
-  <li>Dockerfile must produce a <code>linux/amd64</code> image</li>
+  <li>Public GitHub repo</li>
+  <li>Repo must contain a <code>Dockerfile</code></li>
 </ul>
 
 <pre>$ ecloud compute app deploy
 
-<span class="prompt">? Build from verifiable source?</span> <span class="dim">(y/N)</span> <span class="answer">Yes</span>
+<span class="dim"># Prompt 1</span>
+<span class="prompt">? Build from verifiable source?</span> <span class="dim">(y/N)</span> <span class="answer">y</span>
 
-<span class="prompt">? GitHub repository URL:</span> <span class="answer">https://github.com/yourusername/yourapp</span>
-<span class="dim">  The repo to clone and build from. Must contain a Dockerfile.</span>
+<span class="dim"># Prompt 2 — Source type</span>
+<span class="prompt">? Choose verifiable source type:</span>
+  <span class="prompt">❯ Build from git source (public repo required)</span>
+  <span class="dim">  Use a prebuilt verifiable image (eigencloud-containers)</span>
+<span class="answer">  → Build from git source</span>
 
-<span class="prompt">? Branch / tag / commit:</span> <span class="answer">main</span>
-<span class="dim">  Which ref to build. Use a tag like v1.0.0 for reproducibility.</span>
+<span class="dim"># Prompt 3 — Git repo URL</span>
+<span class="prompt">? Enter public git repository URL:</span> <span class="answer">https://github.com/yourusername/yourapp</span>
 
-<span class="prompt">? Dockerfile path:</span> <span class="answer">.</span>
-<span class="dim">  Path to the Dockerfile relative to the repo root.</span>
+<span class="dim"># Prompt 4 — Git commit SHA (must be full 40-char hex)</span>
+<span class="prompt">? Enter git commit SHA (40 hex chars):</span> <span class="answer">a1b2c3d4e5f6...</span>
 
-<span class="prompt">? Instance type:</span> <span class="dim">(Use arrow keys)</span>
-  <span class="dim">  g1-micro-1v      — Shared 2 vCPUs, 1 GB, Shielded VM</span>
-  <span class="dim">  g1-medium-1v     — Shared 2 vCPUs, 4 GB, Shielded VM</span>
-  <span class="dim">  g1-custom-2-4096s — 2 vCPUs, 4 GB, SEV-SNP</span>
-  <span class="dim">  g1-standard-2s   — 2 vCPUs, 8 GB, SEV-SNP</span>
-  <span class="prompt">❯ g1-standard-4t   — 4 vCPUs, 16 GB, Intel TDX</span>
-  <span class="dim">  g1-standard-8t   — 8 vCPUs, 32 GB, Intel TDX</span>
-<span class="answer">  → g1-standard-4t</span>
+<span class="dim"># Prompt 5 — Build context path</span>
+<span class="prompt">? Enter build context path (relative to repo):</span> <span class="dim">(.)</span> <span class="answer">.</span>
 
-<span class="prompt">? Port:</span> <span class="answer">3000</span>
+<span class="dim"># Prompt 6 — Dockerfile path</span>
+<span class="prompt">? Enter Dockerfile path (relative to build context):</span> <span class="dim">(Dockerfile)</span> <span class="answer">Dockerfile</span>
 
-<span class="prompt">? Environment file path:</span> <span class="answer">.env</span>
+<span class="dim"># Prompt 7 — Caddyfile (optional, for TLS)</span>
+<span class="prompt">? Enter Caddyfile path (relative to build context, optional):</span> <span class="answer">↵</span>
 
+<span class="dim"># Prompt 8 — Build dependencies (optional)</span>
+<span class="prompt">? Enter dependency digests:</span> <span class="answer">↵</span>
+
+<span class="dim"># Prompt 9 — Environment file</span>
+<span class="prompt">? Choose an option:</span>
+  <span class="prompt">❯ Enter path to existing env file</span>
+  <span class="dim">  Continue without env file</span>
+
+<span class="dim">Building from source with verifiable build...</span>
 <span class="dim">Cloning repository...</span>
 <span class="dim">Building Docker image inside TEE...</span>
 <span class="dim">Recording build hash on-chain...</span>
-<span class="dim">Provisioning Intel TDX enclave...</span>
 
-<span class="answer">Transaction sent: 0xcd91...4a8b</span>
 <span class="answer">✓ App deployed from verifiable source</span>
 <span class="answer">➜ App ID: 0x3322DA88C960D99fd6961b191f674F366761b26b</span>
-<span class="answer">➜ Public IP: 34.21.146.83</span>
-<span class="answer">➜ Build hash: 0x7f2a...c1e9 (recorded on-chain)</span></pre>
+<span class="answer">➜ Public IP: 34.21.146.83</span></pre>
+
+<div class="note"><strong>No instance type, log, or monitoring prompts</strong> — verifiable builds use default settings. To customize these, use the flags below.</div>
 
 <p>Or use flags:</p>
-<pre>ecloud compute app deploy \
-  --source-repo https://github.com/yourusername/yourapp \
-  --source-ref main \
+<pre>ecloud compute app deploy --verifiable \
+  --repo https://github.com/yourusername/yourapp \
+  --commit a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2 \
   --env-file .env \
   --instance-type g1-standard-4t \
   --log-visibility public \
   --resource-usage-monitoring enable</pre>
 
-<div class="note"><strong>Verifiable builds</strong> mean anyone can independently verify that your deployed app matches the source code. The build hash is written to the chain — check it on the <a href="https://verify-sepolia.eigencloud.xyz/">EigenCompute Verification Dashboard</a>.</div>
+<div class="note"><strong>Verifiable builds</strong> record the build hash on-chain — anyone can verify at the <a href="https://verify-sepolia.eigencloud.xyz/">EigenCompute Verification Dashboard</a>. You can only have <strong>one build in progress</strong> at a time.</div>
 
-<div class="success">✅ Your app is live with a verifiable, reproducible build. No Docker Hub account needed — EigenCompute built it directly from source.</div>
+<div class="success">✅ Your app is live with a verifiable, reproducible build.</div>
 
 <div class="note">By default, the CLI deploys to <strong>Sepolia testnet</strong>. For mainnet, add <code>--environment mainnet</code> to the command:
 <br><br><code>ecloud compute app deploy --environment mainnet</code></div>
