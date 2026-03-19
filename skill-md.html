@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SKILL.md — Deploy to EigenCompute</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📄</text></svg>">
+<style>
+  body { font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; max-width: 860px; margin: 0 auto; padding: 24px 20px; background: #0d1117; color: #c9d1d9; line-height: 1.6; font-size: 14px; }
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #21262d; }
+  .header h1 { font-size: 18px; margin: 0; color: #58a6ff; font-weight: 600; }
+  .copy-raw-btn { background: #238636; color: #fff; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.2s; }
+  .copy-raw-btn:hover { background: #2ea043; }
+  .copy-raw-btn.copied { background: #1f6feb; }
+  .md-content { white-space: pre-wrap; word-wrap: break-word; }
+  .md-content .h1 { font-size: 22px; font-weight: 700; color: #f0f6fc; margin: 32px 0 8px; }
+  .md-content .h2 { font-size: 18px; font-weight: 600; color: #f0f6fc; margin: 28px 0 8px; }
+  .md-content .h3 { font-size: 15px; font-weight: 600; color: #f0f6fc; margin: 20px 0 6px; }
+  .md-content .hr { border: none; border-top: 1px solid #21262d; margin: 24px 0; }
+  .md-content .code-block { background: #161b22; border: 1px solid #21262d; border-radius: 6px; padding: 12px 16px; margin: 8px 0; overflow-x: auto; color: #79c0ff; }
+  .md-content .code-inline { background: #1c2128; padding: 2px 6px; border-radius: 4px; color: #79c0ff; font-size: 13px; }
+  .md-content .bold { color: #f0f6fc; font-weight: 600; }
+  .md-content .table-wrap { overflow-x: auto; margin: 8px 0; }
+  .md-content table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  .md-content th { background: #161b22; color: #f0f6fc; font-weight: 600; text-align: left; padding: 8px 12px; border: 1px solid #21262d; }
+  .md-content td { padding: 8px 12px; border: 1px solid #21262d; }
+  .md-content ul, .md-content ol { padding-left: 24px; margin: 4px 0; }
+  .md-content li { margin: 2px 0; }
+  .md-content a { color: #58a6ff; text-decoration: none; }
+  .md-content a:hover { text-decoration: underline; }
+  .back-link { color: #8b949e; font-size: 13px; text-decoration: none; }
+  .back-link:hover { color: #58a6ff; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>skill.md</h1>
+    <a href="/" class="back-link">← back to full guide</a>
+  </div>
+  <button class="copy-raw-btn" id="copyBtn">Copy raw markdown</button>
+</div>
+
+<div class="md-content" id="mdContent"></div>
+
+<script>
+const RAW_MD = `# Deploy to EigenCompute
+
+Two deployment methods: **Deploy from registry** (pre-built Docker image) or **Build from verifiable source** (EigenCompute builds from your GitHub repo inside the TEE for reproducible builds).
+
+## Prerequisites
+
+- Node.js 20+
+- \`ecloud\` CLI: \`curl -fsSL https://raw.githubusercontent.com/Layr-Labs/eigencloud-tools/master/install-all.sh | bash\`
+- Docker installed with buildx (registry method only)
+
+---
+
+## Step 1 — Authenticate
+
+\`\`\`bash
+ecloud auth login
+\`\`\`
+
+Stores your private key in OS keyring. Verify with:
+
+\`\`\`bash
+ecloud auth whoami
+\`\`\`
+
+---
+
+## Step 2 — Set Up Billing
+
+\`\`\`bash
+ecloud billing subscribe
+\`\`\`
+
+Required before your first deploy.
+
+---
+
+## Step 3 — Create \`.env\`
+
+Your \`.env\` file gets injected into the TEE at deploy time. Example:
+
+\`\`\`env
+PORT=3000
+DATABASE_URL=postgres://...
+API_KEY=sk-...
+\`\`\`
+
+---
+
+# Method A — Deploy from Registry
+
+Use this when you want to build the Docker image yourself and push it to Docker Hub.
+
+### A1 — Build Your App
+
+\`\`\`bash
+npm run build
+\`\`\`
+
+### A2 — Build & Push Docker Image
+
+**Must be \`linux/amd64\`** — EigenCompute runs Intel TDX enclaves.
+
+\`\`\`bash
+docker buildx build --platform linux/amd64 --no-cache \\
+  -t yourdockerhub/yourapp:v1.0.0 --push .
+\`\`\`
+
+### A3 — Deploy
+
+\`\`\`bash
+ecloud compute app deploy \\
+  --image-ref yourdockerhub/yourapp:v1.0.0 \\
+  --env-file .env \\
+  --instance-type g1-standard-4t \\
+  --log-visibility public \\
+  --resource-usage-monitoring enable
+\`\`\`
+
+The CLI will interactively ask **7 prompts** in this exact order:
+
+| # | Prompt | Answer |
+|---|--------|--------|
+| 1 | \`Build from verifiable source? (y/N)\` | **N** |
+| 2 | \`Enter Docker image reference:\` | \`yourdockerhub/yourapp:v1.0.0\` |
+| 3 | \`Enter app name:\` | Your app name (default: from image) |
+| 4 | \`Choose an option:\` (env file) | \`Enter path to existing env file\` → \`.env\` **or** \`Continue without env file\` |
+| 5 | \`Choose instance:\` | Pick from 6 options (see Instance Types) |
+| 6 | \`Do you want to view your app's logs?\` | \`Yes, publicly viewable by anyone\` |
+| 7 | \`Show resource usage (CPU/memory) for your app?\` | \`Yes, enable resource usage monitoring\` |
+
+No port prompt, no confirmation prompt — deployment starts immediately after prompt 7.
+
+### A4 — Upgrading
+
+Build & push a new image tag, then:
+
+\`\`\`bash
+ecloud compute app upgrade <APP-ID> \\
+  --image-ref yourdockerhub/yourapp:v1.0.1 \\
+  --env-file .env
+\`\`\`
+
+---
+
+# Method B — Build from Verifiable Source
+
+Use this when you want EigenCompute to build your app directly from a GitHub repo. This gives you **reproducible, verifiable builds** — anyone can confirm the running code matches the source.
+
+### Requirements
+
+- Public GitHub repo
+- Repo must contain a \`Dockerfile\`
+
+### B1 — Deploy
+
+\`\`\`bash
+ecloud compute app deploy --verifiable \\
+  --repo https://github.com/yourusername/yourapp \\
+  --commit <40-char-sha> \\
+  --env-file .env \\
+  --instance-type g1-standard-4t \\
+  --log-visibility public \\
+  --resource-usage-monitoring enable
+\`\`\`
+
+The CLI will interactively ask **9 prompts** in this exact order:
+
+| # | Prompt | Answer |
+|---|--------|--------|
+| 1 | \`Build from verifiable source? (y/N)\` | **y** |
+| 2 | \`Choose verifiable source type:\` | \`Build from git source (public repo required)\` |
+| 3 | \`Enter public git repository URL:\` | \`https://github.com/yourusername/yourapp\` |
+| 4 | \`Enter git commit SHA (40 hex chars):\` | Full 40-char commit hash (get yours: \`git rev-parse HEAD\`) |
+| 5 | \`Enter build context path (relative to repo):\` | \`.\` (default) |
+| 6 | \`Enter Dockerfile path (relative to build context):\` | \`Dockerfile\` (default) |
+| 7 | \`Enter Caddyfile path (optional):\` | Press Enter to skip |
+| 8 | \`Enter dependency digests:\` | Press Enter to skip |
+| 9 | \`Choose an option:\` (env file) | \`Enter path to existing env file\` → \`.env\` **or** \`Continue without env file\` |
+
+No instance type, log, or monitoring prompts — verifiable builds use defaults. Use flags to customize.
+
+Only **one verifiable build** can run at a time per account.
+
+### B2 — Upgrading
+
+Push changes to your repo, then redeploy with the new commit SHA:
+
+\`\`\`bash
+ecloud compute app upgrade <APP-ID> --verifiable \\
+  --repo https://github.com/yourusername/yourapp \\
+  --commit <new-40-char-sha> \\
+  --env-file .env
+\`\`\`
+
+---
+
+## Verify
+
+\`\`\`bash
+# Check status
+ecloud compute app info --watch
+
+# Stream logs
+ecloud compute app logs --watch
+
+# Health check
+curl http://<your-ip>:3000/health
+\`\`\`
+
+On success you get:
+- **App ID** (e.g. \`0x8F38007B...82A7\`)
+- **Public IP** (e.g. \`35.222.154.28\`)
+
+---
+
+## Useful Commands
+
+| Command | What it does |
+|---------|-------------|
+| \`ecloud auth whoami\` | Show authenticated address |
+| \`ecloud compute app list\` | List all your apps |
+| \`ecloud compute app info <APP-ID>\` | App status & IP |
+| \`ecloud compute app logs <APP-ID> -w\` | Stream logs |
+| \`ecloud compute app stop <APP-ID>\` | Stop app |
+| \`ecloud compute app start <APP-ID>\` | Start app |
+| \`ecloud compute app terminate <APP-ID>\` | Delete app permanently |
+| \`ecloud billing status\` | Check billing |
+
+---
+
+## Instance Types
+
+| Type | Specs | TEE Technology |
+|------|-------|---------------|
+| \`g1-micro-1v\` | Shared 2 vCPUs, 1 GB memory | Shielded VM (default) |
+| \`g1-medium-1v\` | Shared 2 vCPUs, 4 GB memory | Shielded VM |
+| \`g1-custom-2-4096s\` | 2 vCPUs, 4 GB memory | AMD SEV-SNP |
+| \`g1-standard-2s\` | 2 vCPUs, 8 GB memory | AMD SEV-SNP |
+| \`g1-standard-4t\` | 4 vCPUs, 16 GB memory | Intel TDX |
+| \`g1-standard-8t\` | 8 vCPUs, 32 GB memory | Intel TDX |
+
+---
+
+## Important Notes
+
+- Docker images **must** be \`linux/amd64\` — ARM won't work
+- Your app **must** listen on \`0.0.0.0\` (not \`127.0.0.1\`) — containers need external access
+- Your app runs as \`root\` inside the TEE (required by EigenCompute)
+- \`.env\` vars are encrypted and injected at runtime
+- TEE provides hardware-level isolation via Intel TDX
+- \`g1-micro-1v\` instances do **not** support TDX attestation — use \`g1-standard-4t\` or higher for production
+- KMS signing key available at \`/usr/local/bin/kms-signing-public-key.pem\`
+- **Verifiable builds** (Method B) record the build hash on-chain, enabling third-party verification
+`;
+
+// Render markdown to HTML
+function renderMd(md) {
+  let html = '';
+  const lines = md.split('\n');
+  let inCodeBlock = false;
+  let codeContent = '';
+  let inTable = false;
+  let tableRows = [];
+
+  function flushTable() {
+    if (tableRows.length === 0) return '';
+    let t = '<div class="table-wrap"><table>';
+    tableRows.forEach((row, i) => {
+      const cells = row.split('|').filter(c => c.trim() !== '');
+      if (i === 1 && cells.every(c => c.trim().match(/^[-:]+$/))) return; // skip separator
+      const tag = i === 0 ? 'th' : 'td';
+      t += '<tr>' + cells.map(c => `<${tag}>${inlineFormat(c.trim())}</${tag}>`).join('') + '</tr>';
+    });
+    t += '</table></div>';
+    tableRows = [];
+    inTable = false;
+    return t;
+  }
+
+  function inlineFormat(text) {
+    return text
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\`([^`]+)\`/g, '<span class="code-inline">$1</span>')
+      .replace(/\*\*([^*]+)\*\*/g, '<span class="bold">$1</span>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (line.startsWith('\`\`\`')) {
+      if (inTable) html += flushTable();
+      if (inCodeBlock) {
+        html += '<div class="code-block">' + codeContent.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').trimEnd() + '</div>';
+        codeContent = '';
+        inCodeBlock = false;
+      } else {
+        inCodeBlock = true;
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeContent += line + '\n';
+      continue;
+    }
+
+    if (line.startsWith('|')) {
+      inTable = true;
+      tableRows.push(line);
+      continue;
+    } else if (inTable) {
+      html += flushTable();
+    }
+
+    if (line.startsWith('# ')) { html += '<div class="h1">' + inlineFormat(line.slice(2)) + '</div>'; }
+    else if (line.startsWith('## ')) { html += '<div class="h2">' + inlineFormat(line.slice(3)) + '</div>'; }
+    else if (line.startsWith('### ')) { html += '<div class="h3">' + inlineFormat(line.slice(4)) + '</div>'; }
+    else if (line.startsWith('---')) { html += '<hr class="hr">'; }
+    else if (line.startsWith('- ')) { html += '<ul><li>' + inlineFormat(line.slice(2)) + '</li></ul>'; }
+    else if (line.trim() === '') { html += '<br>'; }
+    else { html += '<div>' + inlineFormat(line) + '</div>'; }
+  }
+  if (inTable) html += flushTable();
+  return html;
+}
+
+document.getElementById('mdContent').innerHTML = renderMd(RAW_MD);
+
+document.getElementById('copyBtn').addEventListener('click', function() {
+  const btn = this;
+  navigator.clipboard.writeText(RAW_MD).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy raw markdown'; btn.classList.remove('copied'); }, 2500);
+  });
+});
+</script>
+</body>
+</html>
