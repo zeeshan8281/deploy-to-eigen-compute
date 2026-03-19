@@ -61,7 +61,8 @@
     <li><a href="#step-6">Create a .dockerignore</a></li>
     <li><a href="#step-7">Build &amp; push Docker image</a></li>
     <li><a href="#step-8">Prepare your .env file</a></li>
-    <li><a href="#step-9">Deploy to EigenCompute</a></li>
+    <li><a href="#step-9">Deploy — Method A: From Registry</a></li>
+    <li><a href="#step-9b">Deploy — Method B: From Verifiable Source</a></li>
     <li><a href="#step-10">Verify your deployment</a></li>
     <li><a href="#upgrading">Upgrading an existing app</a></li>
     <li><a href="#tls">Setting up TLS / custom domain</a></li>
@@ -239,41 +240,39 @@ SECRET_KEY=your-secret</pre>
 <!-- ===== STEP 9 ===== -->
 
 <h2 id="step-9">Step 9 — Deploy to EigenCompute</h2>
-<p>This is the main event. Run the deploy command — the CLI will interactively prompt you for each option, one at a time. No flags to memorize.</p>
+<p>Two deployment methods are available. Pick the one that fits your workflow:</p>
+<table>
+  <tr><th>Method</th><th>When to use</th><th>Pros</th></tr>
+  <tr><td><strong><a href="#step-9a">A — Deploy from Registry</a></strong></td><td>You build the Docker image yourself and push to Docker Hub</td><td>Full control over the build, faster iteration</td></tr>
+  <tr><td><strong><a href="#step-9b">B — Build from Verifiable Source</a></strong></td><td>You want EigenCompute to build from your GitHub repo</td><td>Reproducible builds, on-chain build hash verification</td></tr>
+</table>
+
+<h3 id="step-9a">Method A — Deploy from Registry</h3>
+<p>You've already built and pushed a Docker image (Step 7). Now deploy it. The CLI will interactively prompt you for each option.</p>
 
 <pre>$ ecloud compute app deploy
 
-<span class="prompt">? App name:</span> <span class="answer">myapp</span>
-<span class="dim">  A friendly name for your app. Used in the dashboard and CLI.</span>
-
-<span class="prompt">? App description:</span> <span class="answer">My awesome app on EigenCompute</span>
-
-<span class="prompt">? Image reference:</span> <span class="answer">yourdockerhub/yourapp:v1.0.0</span>
-<span class="dim">  The Docker image to deploy. Must be pushed to a public registry.</span>
-
-<span class="prompt">? Environment file path:</span> <span class="answer">.env</span>
-<span class="dim">  Path to your .env file. Variables are encrypted before injection.</span>
-
-<span class="prompt">? Instance type:</span> <span class="dim">(Use arrow keys)</span>
-  <span class="prompt">❯ g1-standard-4t</span>
-  <span class="dim">  g1-standard-8t</span>
-<span class="answer">  → g1-standard-4t</span>
-
-<span class="prompt">? Log visibility:</span> <span class="dim">(Use arrow keys)</span>
-  <span class="prompt">❯ public</span>
-  <span class="dim">  private</span>
-  <span class="dim">  off</span>
-<span class="answer">  → public</span>
-
-<span class="prompt">? Enable resource monitoring?</span> <span class="dim">(Y/n)</span> <span class="answer">Yes</span>
-
 <span class="prompt">? Build from verifiable source?</span> <span class="dim">(y/N)</span> <span class="answer">No</span>
-<span class="dim">  Select No if you've already pushed a pre-built image to a registry.</span>
+<span class="dim">  Select No — you've already pushed a pre-built image to a registry.</span>
 
 <span class="prompt">? Deployment method:</span> <span class="dim">(Use arrow keys)</span>
   <span class="dim">  Build on EigenCompute</span>
   <span class="prompt">❯ Deploy from registry</span>
 <span class="answer">  → Deploy from registry</span>
+
+<span class="prompt">? Image reference:</span> <span class="answer">yourdockerhub/yourapp:v1.0.0</span>
+<span class="dim">  The Docker image to deploy. Must be pushed to a public registry.</span>
+
+<span class="prompt">? Instance type:</span> <span class="dim">(Use arrow keys)</span>
+  <span class="dim">  g1-micro-1v</span>
+  <span class="prompt">❯ g1-standard-4t</span>
+  <span class="dim">  g1-standard-8t</span>
+<span class="answer">  → g1-standard-4t</span>
+
+<span class="prompt">? Port:</span> <span class="answer">3000</span>
+
+<span class="prompt">? Environment file path:</span> <span class="answer">.env</span>
+<span class="dim">  Path to your .env file. Variables are encrypted before injection.</span>
 
 <span class="dim">Pulling image from Docker Hub...</span>
 <span class="dim">Provisioning Intel TDX enclave...</span>
@@ -284,10 +283,75 @@ SECRET_KEY=your-secret</pre>
 <span class="answer">➜ App ID: 0x8F38007B8F7D91c77CEd4dEE0dbD361c130982A7</span>
 <span class="answer">➜ Public IP: 35.222.154.28</span></pre>
 
-<div class="note">By default, the CLI deploys to <strong>Sepolia testnet</strong>. For mainnet, add <code>--environment mainnet</code> to the command:
-<br><br><code>ecloud compute app deploy --environment mainnet</code></div>
+<p>Or use flags to skip interactive prompts:</p>
+<pre>ecloud compute app deploy \
+  --image-ref yourdockerhub/yourapp:v1.0.0 \
+  --env-file .env \
+  --instance-type g1-standard-4t \
+  --log-visibility public \
+  --resource-usage-monitoring enable</pre>
 
 <div class="success">✅ Your app is now running inside an Intel TDX Trusted Execution Environment. Save your <strong>App ID</strong> — you'll need it for upgrades, logs, and management.</div>
+
+<h3 id="step-9b">Method B — Build from Verifiable Source</h3>
+<p>Instead of building locally and pushing to Docker Hub, you can have EigenCompute clone your GitHub repo and build the image inside the TEE. This gives you <strong>reproducible, verifiable builds</strong> — the build hash is recorded on-chain so anyone can confirm the running code matches your source repo.</p>
+
+<p><strong>Requirements:</strong></p>
+<ul>
+  <li>Public GitHub repo (or private with access token)</li>
+  <li>Repo must contain a <code>Dockerfile</code> at the root</li>
+  <li>Dockerfile must produce a <code>linux/amd64</code> image</li>
+</ul>
+
+<pre>$ ecloud compute app deploy
+
+<span class="prompt">? Build from verifiable source?</span> <span class="dim">(y/N)</span> <span class="answer">Yes</span>
+
+<span class="prompt">? GitHub repository URL:</span> <span class="answer">https://github.com/yourusername/yourapp</span>
+<span class="dim">  The repo to clone and build from. Must contain a Dockerfile.</span>
+
+<span class="prompt">? Branch / tag / commit:</span> <span class="answer">main</span>
+<span class="dim">  Which ref to build. Use a tag like v1.0.0 for reproducibility.</span>
+
+<span class="prompt">? Dockerfile path:</span> <span class="answer">.</span>
+<span class="dim">  Path to the Dockerfile relative to the repo root.</span>
+
+<span class="prompt">? Instance type:</span> <span class="dim">(Use arrow keys)</span>
+  <span class="dim">  g1-micro-1v</span>
+  <span class="prompt">❯ g1-standard-4t</span>
+  <span class="dim">  g1-standard-8t</span>
+<span class="answer">  → g1-standard-4t</span>
+
+<span class="prompt">? Port:</span> <span class="answer">3000</span>
+
+<span class="prompt">? Environment file path:</span> <span class="answer">.env</span>
+
+<span class="dim">Cloning repository...</span>
+<span class="dim">Building Docker image inside TEE...</span>
+<span class="dim">Recording build hash on-chain...</span>
+<span class="dim">Provisioning Intel TDX enclave...</span>
+
+<span class="answer">Transaction sent: 0xcd91...4a8b</span>
+<span class="answer">✓ App deployed from verifiable source</span>
+<span class="answer">➜ App ID: 0x3322DA88C960D99fd6961b191f674F366761b26b</span>
+<span class="answer">➜ Public IP: 34.21.146.83</span>
+<span class="answer">➜ Build hash: 0x7f2a...c1e9 (recorded on-chain)</span></pre>
+
+<p>Or use flags:</p>
+<pre>ecloud compute app deploy \
+  --source-repo https://github.com/yourusername/yourapp \
+  --source-ref main \
+  --env-file .env \
+  --instance-type g1-standard-4t \
+  --log-visibility public \
+  --resource-usage-monitoring enable</pre>
+
+<div class="note"><strong>Verifiable builds</strong> mean anyone can independently verify that your deployed app matches the source code. The build hash is written to the chain — check it on the <a href="https://verify-sepolia.eigencloud.xyz/">EigenCompute Verification Dashboard</a>.</div>
+
+<div class="success">✅ Your app is live with a verifiable, reproducible build. No Docker Hub account needed — EigenCompute built it directly from source.</div>
+
+<div class="note">By default, the CLI deploys to <strong>Sepolia testnet</strong>. For mainnet, add <code>--environment mainnet</code> to the command:
+<br><br><code>ecloud compute app deploy --environment mainnet</code></div>
 
 <p>You can also monitor your app in the <a href="https://console.eigencloud.xyz/">EigenCloud Developer Console</a> web UI.</p>
 
@@ -469,21 +533,26 @@ ecloud compute app terminate &lt;APP-ID&gt;</pre>
 <h3>Instance Types</h3>
 <table>
   <tr><th>Type</th><th>Description</th></tr>
+  <tr><td><code>g1-micro-1v</code></td><td>1-core — testing only, <strong>no TDX attestation</strong></td></tr>
   <tr><td><code>g1-standard-4t</code></td><td>4-core Intel TDX enclave</td></tr>
   <tr><td><code>g1-standard-8t</code></td><td>8-core Intel TDX enclave</td></tr>
 </table>
+<div class="danger"><code>g1-micro-1v</code> does <strong>not</strong> support TDX attestation. Use it only for quick tests. For production, always use <code>g1-standard-4t</code> or higher.</div>
 
 <!-- ===== NOTES ===== -->
 
 <h2>Important Notes</h2>
 <ul>
   <li>Docker images <strong>must be <code>linux/amd64</code></strong> — ARM will not work on <a href="https://www.intel.com/content/www/us/en/developer/tools/trust-domain-extensions/overview.html">Intel TDX</a></li>
+  <li>Your app <strong>must listen on <code>0.0.0.0</code></strong>, not <code>127.0.0.1</code> — containers need external network access. This is the #1 cause of "deployed but unreachable" issues</li>
   <li>Your app <strong>must run as <code>root</code></strong> inside the container (TEE requirement)</li>
   <li>Environment variables are <strong>encrypted</strong> and injected at runtime — never touch disk unencrypted</li>
   <li>TEE provides <strong>hardware-level isolation</strong> — your code and data are protected even from the host machine operator</li>
   <li>A KMS signing key is available inside the TEE at <code>/usr/local/bin/kms-signing-public-key.pem</code> for <a href="https://docs.eigencloud.xyz/eigencloud/eigencloud-overview">cryptographic attestation</a></li>
   <li>Default environment is <strong>Sepolia testnet</strong>. Use <code>--environment mainnet</code> for production</li>
   <li>Use <code>deploy</code> for first-time, <code>upgrade</code> for updates</li>
+  <li><strong>Verifiable builds</strong> (Method B) record the build hash on-chain — anyone can verify your deployed code matches the GitHub source</li>
+  <li><code>g1-micro-1v</code> instances do <strong>not</strong> support TDX attestation — use <code>g1-standard-4t</code> or higher for production</li>
 </ul>
 
 <!-- ===== RESOURCES ===== -->
