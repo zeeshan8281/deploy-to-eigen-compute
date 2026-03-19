@@ -264,9 +264,12 @@ SECRET_KEY=your-secret</pre>
 <span class="dim">  The Docker image to deploy. Must be pushed to a public registry.</span>
 
 <span class="prompt">? Instance type:</span> <span class="dim">(Use arrow keys)</span>
-  <span class="dim">  g1-micro-1v</span>
-  <span class="prompt">❯ g1-standard-4t</span>
-  <span class="dim">  g1-standard-8t</span>
+  <span class="dim">  g1-micro-1v      — Shared 2 vCPUs, 1 GB, Shielded VM</span>
+  <span class="dim">  g1-medium-1v     — Shared 2 vCPUs, 4 GB, Shielded VM</span>
+  <span class="dim">  g1-custom-2-4096s — 2 vCPUs, 4 GB, SEV-SNP</span>
+  <span class="dim">  g1-standard-2s   — 2 vCPUs, 8 GB, SEV-SNP</span>
+  <span class="prompt">❯ g1-standard-4t   — 4 vCPUs, 16 GB, Intel TDX</span>
+  <span class="dim">  g1-standard-8t   — 8 vCPUs, 32 GB, Intel TDX</span>
 <span class="answer">  → g1-standard-4t</span>
 
 <span class="prompt">? Port:</span> <span class="answer">3000</span>
@@ -317,9 +320,12 @@ SECRET_KEY=your-secret</pre>
 <span class="dim">  Path to the Dockerfile relative to the repo root.</span>
 
 <span class="prompt">? Instance type:</span> <span class="dim">(Use arrow keys)</span>
-  <span class="dim">  g1-micro-1v</span>
-  <span class="prompt">❯ g1-standard-4t</span>
-  <span class="dim">  g1-standard-8t</span>
+  <span class="dim">  g1-micro-1v      — Shared 2 vCPUs, 1 GB, Shielded VM</span>
+  <span class="dim">  g1-medium-1v     — Shared 2 vCPUs, 4 GB, Shielded VM</span>
+  <span class="dim">  g1-custom-2-4096s — 2 vCPUs, 4 GB, SEV-SNP</span>
+  <span class="dim">  g1-standard-2s   — 2 vCPUs, 8 GB, SEV-SNP</span>
+  <span class="prompt">❯ g1-standard-4t   — 4 vCPUs, 16 GB, Intel TDX</span>
+  <span class="dim">  g1-standard-8t   — 8 vCPUs, 32 GB, Intel TDX</span>
 <span class="answer">  → g1-standard-4t</span>
 
 <span class="prompt">? Port:</span> <span class="answer">3000</span>
@@ -532,12 +538,15 @@ ecloud compute app terminate &lt;APP-ID&gt;</pre>
 
 <h3>Instance Types</h3>
 <table>
-  <tr><th>Type</th><th>Description</th></tr>
-  <tr><td><code>g1-micro-1v</code></td><td>1-core — testing only, <strong>no TDX attestation</strong></td></tr>
-  <tr><td><code>g1-standard-4t</code></td><td>4-core Intel TDX enclave</td></tr>
-  <tr><td><code>g1-standard-8t</code></td><td>8-core Intel TDX enclave</td></tr>
+  <tr><th>Type</th><th>Specs</th><th>TEE Technology</th></tr>
+  <tr><td><code>g1-micro-1v</code></td><td>Shared 2 vCPUs, 1 GB memory</td><td>Shielded VM (default)</td></tr>
+  <tr><td><code>g1-medium-1v</code></td><td>Shared 2 vCPUs, 4 GB memory</td><td>Shielded VM</td></tr>
+  <tr><td><code>g1-custom-2-4096s</code></td><td>2 vCPUs, 4 GB memory</td><td>AMD SEV-SNP</td></tr>
+  <tr><td><code>g1-standard-2s</code></td><td>2 vCPUs, 8 GB memory</td><td>AMD SEV-SNP</td></tr>
+  <tr><td><code>g1-standard-4t</code></td><td>4 vCPUs, 16 GB memory</td><td>Intel TDX</td></tr>
+  <tr><td><code>g1-standard-8t</code></td><td>8 vCPUs, 32 GB memory</td><td>Intel TDX</td></tr>
 </table>
-<div class="danger"><code>g1-micro-1v</code> does <strong>not</strong> support TDX attestation. Use it only for quick tests. For production, always use <code>g1-standard-4t</code> or higher.</div>
+<div class="note"><strong>Shielded VM</strong> (<code>g1-micro</code>, <code>g1-medium</code>) — basic isolation, good for testing. <strong>AMD SEV-SNP</strong> (<code>g1-custom</code>, <code>g1-standard-2s</code>) — hardware memory encryption. <strong>Intel TDX</strong> (<code>g1-standard-4t</code>, <code>g1-standard-8t</code>) — full trusted execution with attestation. Use TDX or SEV-SNP for production.</div>
 
 <!-- ===== NOTES ===== -->
 
