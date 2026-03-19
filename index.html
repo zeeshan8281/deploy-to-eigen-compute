@@ -615,17 +615,14 @@ ecloud compute app terminate &lt;APP-ID&gt;</pre>
   <p style="font-size: 14px; color: #999; margin-top: 12px;">Happy to help you get deployed.</p>
 </div>
 
-<button class="llm-copy-btn" id="llmCopyBtn" title="Copy as markdown for Claude Code / ChatGPT / LLMs">
+<a href="/skill.md" class="llm-copy-btn" title="View as markdown for Claude Code / ChatGPT / LLMs" style="text-decoration: none; color: #fff;">
   <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
   Copy for LLM
-</button>
+</a>
 
 <script>
-const LLM_MARKDOWN = `# Deploy to EigenCompute — Complete Guide
-
-Two deployment methods: **Deploy from registry** (pre-built Docker image) or **Build from verifiable source** (EigenCompute builds from your GitHub repo inside the TEE for reproducible builds).
-
-## Prerequisites
+/* LLM markdown now at /skill.md — floating button links there */
+const _x = `
 
 - Node.js 20+
 - \\\`ecloud\\\` CLI: \\\`curl -fsSL https://raw.githubusercontent.com/Layr-Labs/eigencloud-tools/master/install-all.sh | bash\\\`
@@ -824,20 +821,6 @@ curl http://<your-ip>:3000/health
 - KMS signing key available at /usr/local/bin/kms-signing-public-key.pem
 - Verifiable builds record build hash on-chain for third-party verification
 `;
-
-document.getElementById('llmCopyBtn').addEventListener('click', function() {
-  const btn = this;
-  // Unescape the backticks
-  const md = LLM_MARKDOWN.replace(/\\\\/g, '');
-  navigator.clipboard.writeText(md).then(() => {
-    btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg> Copied!';
-    btn.classList.add('copied');
-    setTimeout(() => {
-      btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2z"/></svg> Copy for LLM';
-      btn.classList.remove('copied');
-    }, 2500);
-  });
-});
 </script>
 
 <script>
