@@ -39,6 +39,10 @@
   .toc a:hover { text-decoration: underline; }
   .badge { display: inline-block; background: #e9ecef; color: #555; font-size: 13px; padding: 2px 8px; border-radius: 4px; margin-left: 6px; }
   a { color: #1A0C6D; }
+  .llm-copy-btn { position: fixed; bottom: 24px; right: 24px; background: #1A0C6D; color: #fff; border: none; border-radius: 12px; padding: 14px 20px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 16px rgba(26,12,109,0.3); z-index: 100; display: flex; align-items: center; gap: 8px; transition: all 0.2s; font-family: inherit; }
+  .llm-copy-btn:hover { background: #2a1a8d; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(26,12,109,0.4); }
+  .llm-copy-btn.copied { background: #28a745; }
+  .llm-copy-btn svg { width: 18px; height: 18px; fill: currentColor; }
 </style>
 </head>
 <body>
@@ -610,6 +614,231 @@ ecloud compute app terminate &lt;APP-ID&gt;</pre>
   <p style="font-size: 22px; color: #333; margin: 0; font-weight: 600;">Reach out to <a href="https://t.me/zeeshan8281" style="color: #1A0C6D; text-decoration: none; border-bottom: 2px solid #95BFFF;">@zeeshan8281</a> on Telegram</p>
   <p style="font-size: 14px; color: #999; margin-top: 12px;">Happy to help you get deployed.</p>
 </div>
+
+<button class="llm-copy-btn" id="llmCopyBtn" title="Copy as markdown for Claude Code / ChatGPT / LLMs">
+  <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+  Copy for LLM
+</button>
+
+<script>
+const LLM_MARKDOWN = `# Deploy to EigenCompute — Complete Guide
+
+Two deployment methods: **Deploy from registry** (pre-built Docker image) or **Build from verifiable source** (EigenCompute builds from your GitHub repo inside the TEE for reproducible builds).
+
+## Prerequisites
+
+- Node.js 20+
+- \\\`ecloud\\\` CLI: \\\`curl -fsSL https://raw.githubusercontent.com/Layr-Labs/eigencloud-tools/master/install-all.sh | bash\\\`
+- Docker installed with buildx (registry method only)
+
+## Step 1 — Authenticate
+
+\\\`\\\`\\\`bash
+ecloud auth login
+\\\`\\\`\\\`
+
+Stores your private key in OS keyring. Verify with:
+
+\\\`\\\`\\\`bash
+ecloud auth whoami
+\\\`\\\`\\\`
+
+## Step 2 — Set Up Billing
+
+\\\`\\\`\\\`bash
+ecloud billing subscribe
+\\\`\\\`\\\`
+
+Required before your first deploy.
+
+## Step 3 — Create .env
+
+Your .env file gets injected into the TEE at deploy time. Example:
+
+\\\`\\\`\\\`
+PORT=3000
+DATABASE_URL=postgres://...
+API_KEY=sk-...
+\\\`\\\`\\\`
+
+## Step 4 — Write Your Dockerfile
+
+Must produce a linux/amd64 image. Must run as root. Example (Node.js):
+
+\\\`\\\`\\\`dockerfile
+FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+EXPOSE 3000
+USER root
+CMD ["node", "dist/index.js"]
+\\\`\\\`\\\`
+
+CRITICAL: Your app MUST listen on 0.0.0.0, NOT 127.0.0.1.
+
+---
+
+# Method A — Deploy from Registry
+
+### Build & Push Docker Image
+
+\\\`\\\`\\\`bash
+docker buildx build --platform linux/amd64 --no-cache -t yourdockerhub/yourapp:v1.0.0 --push .
+\\\`\\\`\\\`
+
+### Deploy (7 interactive prompts in this exact order)
+
+\\\`\\\`\\\`bash
+ecloud compute app deploy
+\\\`\\\`\\\`
+
+| # | Prompt | Answer |
+|---|--------|--------|
+| 1 | Build from verifiable source? (y/N) | N |
+| 2 | Enter Docker image reference: | yourdockerhub/yourapp:v1.0.0 |
+| 3 | Enter app name: | Your app name (default: from image) |
+| 4 | Choose an option: (env file) | "Enter path to existing env file" → .env OR "Continue without env file" |
+| 5 | Choose instance: | Pick from 6 options (see Instance Types below) |
+| 6 | Do you want to view your app's logs? | "Yes, publicly viewable by anyone" |
+| 7 | Show resource usage (CPU/memory) for your app? | "Yes, enable resource usage monitoring" |
+
+No port prompt. No confirmation prompt. Deployment starts immediately after prompt 7.
+
+Or use flags to skip prompts:
+
+\\\`\\\`\\\`bash
+ecloud compute app deploy \\\\
+  --image-ref yourdockerhub/yourapp:v1.0.0 \\\\
+  --env-file .env \\\\
+  --instance-type g1-standard-4t \\\\
+  --log-visibility public \\\\
+  --resource-usage-monitoring enable
+\\\`\\\`\\\`
+
+### Upgrade
+
+\\\`\\\`\\\`bash
+ecloud compute app upgrade <APP-ID> --image-ref yourdockerhub/yourapp:v1.0.1 --env-file .env
+\\\`\\\`\\\`
+
+---
+
+# Method B — Build from Verifiable Source
+
+Requirements: Public GitHub repo with a Dockerfile.
+
+### Deploy (9 interactive prompts in this exact order)
+
+\\\`\\\`\\\`bash
+ecloud compute app deploy
+\\\`\\\`\\\`
+
+| # | Prompt | Answer |
+|---|--------|--------|
+| 1 | Build from verifiable source? (y/N) | y |
+| 2 | Choose verifiable source type: | "Build from git source (public repo required)" |
+| 3 | Enter public git repository URL: | https://github.com/yourusername/yourapp |
+| 4 | Enter git commit SHA (40 hex chars): | Full SHA (get with: git rev-parse HEAD) |
+| 5 | Enter build context path (relative to repo): | . (default) |
+| 6 | Enter Dockerfile path (relative to build context): | Dockerfile (default) |
+| 7 | Enter Caddyfile path (optional): | Press Enter to skip |
+| 8 | Enter dependency digests: | Press Enter to skip |
+| 9 | Choose an option: (env file) | "Enter path to existing env file" → .env OR "Continue without env file" |
+
+No instance type, log, or monitoring prompts — verifiable builds use defaults. Use flags to customize.
+Only one verifiable build can run at a time per account.
+
+Or use flags:
+
+\\\`\\\`\\\`bash
+ecloud compute app deploy --verifiable \\\\
+  --repo https://github.com/yourusername/yourapp \\\\
+  --commit <40-char-sha> \\\\
+  --env-file .env \\\\
+  --instance-type g1-standard-4t \\\\
+  --log-visibility public \\\\
+  --resource-usage-monitoring enable
+\\\`\\\`\\\`
+
+### Upgrade
+
+\\\`\\\`\\\`bash
+ecloud compute app upgrade <APP-ID> --verifiable \\\\
+  --repo https://github.com/yourusername/yourapp \\\\
+  --commit <new-sha> --env-file .env
+\\\`\\\`\\\`
+
+---
+
+## Verify Deployment
+
+\\\`\\\`\\\`bash
+ecloud compute app info --watch
+ecloud compute app logs --watch
+curl http://<your-ip>:3000/health
+\\\`\\\`\\\`
+
+## Instance Types
+
+| Type | Specs | TEE |
+|------|-------|-----|
+| g1-micro-1v | Shared 2 vCPUs, 1 GB | Shielded VM (default) |
+| g1-medium-1v | Shared 2 vCPUs, 4 GB | Shielded VM |
+| g1-custom-2-4096s | 2 vCPUs, 4 GB | AMD SEV-SNP |
+| g1-standard-2s | 2 vCPUs, 8 GB | AMD SEV-SNP |
+| g1-standard-4t | 4 vCPUs, 16 GB | Intel TDX |
+| g1-standard-8t | 8 vCPUs, 32 GB | Intel TDX |
+
+## All Commands
+
+| Command | What it does |
+|---------|-------------|
+| ecloud auth login | Store private key in OS keyring |
+| ecloud auth generate --store | Generate new key and store it |
+| ecloud auth whoami | Show authenticated address |
+| ecloud billing subscribe | Create billing subscription |
+| ecloud billing status | Check subscription status |
+| ecloud compute app create | Scaffold a new project |
+| ecloud compute app deploy | Deploy a new app |
+| ecloud compute app upgrade <APP-ID> | Upgrade existing app |
+| ecloud compute app info <APP-ID> | App status & IP |
+| ecloud compute app logs <APP-ID> -w | Stream logs |
+| ecloud compute app list | List all apps |
+| ecloud compute app stop <APP-ID> | Stop app |
+| ecloud compute app start <APP-ID> | Start app |
+| ecloud compute app terminate <APP-ID> | Delete app permanently |
+| ecloud compute app configure tls | Set up HTTPS with Let's Encrypt |
+
+## Important Notes
+
+- Docker images MUST be linux/amd64 — ARM won't work
+- App MUST listen on 0.0.0.0 (not 127.0.0.1)
+- App runs as root inside TEE (required)
+- .env vars are encrypted and injected at runtime
+- Shielded VM (micro/medium) = basic isolation, good for testing
+- AMD SEV-SNP (custom/2s) = hardware memory encryption
+- Intel TDX (4t/8t) = full trusted execution with attestation — use for production
+- KMS signing key available at /usr/local/bin/kms-signing-public-key.pem
+- Verifiable builds record build hash on-chain for third-party verification
+`;
+
+document.getElementById('llmCopyBtn').addEventListener('click', function() {
+  const btn = this;
+  // Unescape the backticks
+  const md = LLM_MARKDOWN.replace(/\\\\/g, '');
+  navigator.clipboard.writeText(md).then(() => {
+    btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg> Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10H7v-2h10v2zm0-4H7V7h10v2z"/></svg> Copy for LLM';
+      btn.classList.remove('copied');
+    }, 2500);
+  });
+});
+</script>
 
 <script>
 document.querySelectorAll('pre').forEach(pre => {
